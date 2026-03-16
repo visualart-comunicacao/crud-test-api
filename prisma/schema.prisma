@@ -177,16 +177,26 @@ model Product {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  isActive        Boolean  @default(true)
-  controlaEstoque Boolean  @default(false)
-  estoqueAtual    Decimal? @db.Decimal(10, 3)
-  unidade         String?
-  setorImpressao  String?
+  imageUrl        String?
+  prepTimeMinutes Int?
+  isFeatured      Boolean @default(false)
+
+  isActive      Boolean  @default(true)
+  controlsStock Boolean  @default(false)
+  stockCurrent  Decimal? @db.Decimal(10, 3)
+  unit          String?
+  printSector   String?
+
+  availableInStore  Boolean @default(true)
+  availableDelivery Boolean @default(true)
+  availableCounter  Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orderItems OrderItem[]
+  orderItems  OrderItem[]
+  additionals ProductAdditional[]
+  comboItems  ComboItem[]
 }
 
 model RestaurantTable {
@@ -356,4 +366,59 @@ model CashMovement {
   @@index([cashRegisterId])
   @@index([type])
   @@index([orderId])
+}
+
+model Additional {
+  id       String  @id @default(cuid())
+  name     String
+  price    Decimal @db.Decimal(10, 2)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products ProductAdditional[]
+
+  @@unique([name])
+}
+
+model ProductAdditional {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  additionalId String
+  additional   Additional @relation(fields: [additionalId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, additionalId])
+}
+
+model Combo {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ComboItem[]
+}
+
+model ComboItem {
+  id String @id @default(cuid())
+
+  comboId String
+  combo   Combo  @relation(fields: [comboId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([comboId, productId])
 }
