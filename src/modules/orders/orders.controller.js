@@ -36,6 +36,20 @@ async function addItem(req, res, next) {
   }
 }
 
+async function updateItem(req, res, next) {
+  try {
+    const result = await service.updateItem(
+      req.params.id,
+      req.params.itemId,
+      req.body,
+      req.user,
+    )
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 async function cancelItem(req, res, next) {
   try {
     const result = await service.cancelItem(
@@ -44,6 +58,15 @@ async function cancelItem(req, res, next) {
       req.body,
       req.user,
     )
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function transferTable(req, res, next) {
+  try {
+    const result = await service.transferTable(req.params.id, req.body, req.user)
     res.json(result)
   } catch (error) {
     next(error)
@@ -68,12 +91,39 @@ async function cancel(req, res, next) {
   }
 }
 
+async function sendToKitchen(req, res, next) {
+  try {
+    const result = await service.sendToKitchen(req.params.id, req.user)
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+async function receipt(req, res, next) {
+  try {
+    const result = await service.generateReceiptPdf(req.params.id)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="comanda-${req.params.id}.pdf"`,
+    )
+    result.pipe(res)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export default {
   list,
   getById,
   create,
   addItem,
+  updateItem,
   cancelItem,
+  transferTable,
   close,
   cancel,
+  sendToKitchen,
+  receipt
 }
