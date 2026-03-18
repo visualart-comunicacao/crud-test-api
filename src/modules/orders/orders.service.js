@@ -1,4 +1,5 @@
 import prisma from "../../lib/prisma.js";
+import cashRegisterService from "../cash-register/cash-register.service.js";
 import PDFDocument from "pdfkit";
 
 function createError(message, statusCode = 400) {
@@ -242,6 +243,12 @@ async function getById(id) {
 }
 
 async function create({ tableId, customerName, notes }, user) {
+  const openCashRegister = await cashRegisterService.getOpenCashRegisterOrNull();
+
+  if (!openCashRegister) {
+    throw createError("É necessário abrir o caixa antes de abrir uma comanda", 400);
+  }
+
   if (!tableId) {
     throw createError("Mesa é obrigatória");
   }
@@ -592,6 +599,12 @@ async function transferTable(orderId, body) {
 }
 
 async function close(orderId, user) {
+  const openCashRegister = await cashRegisterService.getOpenCashRegisterOrNull();
+
+  if (!openCashRegister) {
+    throw createError("É necessário abrir o caixa antes de abrir uma comanda", 400);
+  }
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
   });
@@ -626,6 +639,12 @@ async function close(orderId, user) {
 }
 
 async function cancel(orderId, body, user) {
+  const openCashRegister = await cashRegisterService.getOpenCashRegisterOrNull();
+
+  if (!openCashRegister) {
+    throw createError("É necessário abrir o caixa antes de abrir uma comanda", 400);
+  }
+  
   const order = await prisma.order.findUnique({
     where: { id: orderId },
   });

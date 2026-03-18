@@ -481,19 +481,6 @@ async function getById(id) {
   }
 }
 
-/**
- * Já deixa pronto para o próximo passo:
- * fechar a comanda e registrar os pagamentos no caixa.
- *
- * body esperado:
- * {
- *   payments: [
- *     { method: 'PIX', amount: 50 },
- *     { method: 'DINHEIRO', amount: 30 }
- *   ],
- *   notes: 'Pagamento parcial em pix e restante dinheiro'
- * }
- */
 async function registerOrderPayment(orderId, { payments, notes }, userId) {
   if (!userId) {
     throw createError('Usuário não autenticado para registrar pagamento', 401)
@@ -632,5 +619,6 @@ export default {
   listMovementsCurrent,
   listHistory,
   getById,
-  registerOrderPayment,
+  getOpenCashRegisterOrNull,
+  getOpenCashRegisterOrThrow,
 }
