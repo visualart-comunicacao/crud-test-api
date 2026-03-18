@@ -5,10 +5,8 @@ import authorize from '../../middlewares/authorize.middleware.js'
 
 const router = Router()
 
-router.use(authMiddleware)
-
 router.get('/', authorize('ADMIN'), controller.listUsers)
-router.post('/', authorize('ADMIN'), controller.createUser)
+router.post('/', controller.createUser)
 router.put('/:id', authorize('ADMIN'), controller.updateUser)
 router.patch('/:id/reset-password', authorize('ADMIN'), controller.resetPassword)
 router.patch('/:id/status', authorize('ADMIN'), controller.toggleStatus)
