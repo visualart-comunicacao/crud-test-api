@@ -333,6 +333,8 @@ model CashRegister {
   expectedAmount   Decimal @default(0) @db.Decimal(10, 2)
   informedAmount   Decimal? @db.Decimal(10, 2)
   differenceAmount Decimal? @db.Decimal(10, 2)
+  openingNotes String?
+  closingNotes String?
 
   openedAt DateTime @default(now())
   closedAt DateTime?
