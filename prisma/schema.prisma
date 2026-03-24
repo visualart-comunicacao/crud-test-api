@@ -416,3 +416,63 @@ model ComboItem {
 
   @@unique([comboId, productId])
 }
+
+model Setting {
+  id Int @id @default(autoincrement())
+
+  razaoSocial                String?
+  nomeFantasia               String?
+  cnpj                       String?
+  telefone                   String?
+  whatsapp                   String?
+  email                      String?
+  endereco                   String?
+  numero                     String?
+  bairro                     String?
+  cidade                     String?
+  uf                         String?
+  cep                        String?
+  horarioFuncionamento       String?
+  taxaServico                Float?
+  couvert                    Float?
+  rodapeCupom                String?
+  logoUrl                    String?
+
+  usaMesa                    Boolean  @default(true)
+  usaComanda                 Boolean  @default(true)
+  comandaObrigatoria         Boolean  @default(false)
+  qtdMesas                   Int?
+  separarPedidoPorSetor      Boolean  @default(true)
+  bloquearVendaSemEstoque    Boolean  @default(true)
+  exigirObservacaoCancelamento Boolean @default(true)
+  permitirDescontoLivre      Boolean  @default(false)
+
+  impressoraCozinha          String?
+  impressoraBar              String?
+  impressoraCaixa            String?
+  tamanhoPapel               String?
+  imprimirAutomaticamente    Boolean  @default(true)
+  imprimirDuasVias           Boolean  @default(false)
+  imprimirNomeGarcom         Boolean  @default(true)
+  imprimirHorario            Boolean  @default(true)
+
+  somNovoPedido              Boolean  @default(true)
+  alertaPedidoPronto         Boolean  @default(true)
+  alertaMesaAbertaSemConsumo Boolean  @default(false)
+  tempoAlertaMesaSemConsumo  Int?
+
+  tema                       String?
+  formatoData                String?
+  fusoHorario                String?
+  logoutAutomaticoMinutos    Int?
+  forcarTrocaSenhaPadrao     Boolean  @default(true)
+  exibirAtalhosInicio        Boolean  @default(true)
+
+  whatsappToken              String?
+  webhookPedidos             String?
+  ifoodHabilitado            Boolean  @default(false)
+  apiEntregaHabilitada       Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
