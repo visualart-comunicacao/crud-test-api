@@ -114,6 +114,15 @@ async function receipt(req, res, next) {
   }
 }
 
+async function createQuickSale(req, res, next) {
+  try {
+    const result = await service.createQuickSale(req.body, req.user)
+    return res.status(201).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export default {
   list,
   getById,
@@ -125,5 +134,6 @@ export default {
   close,
   cancel,
   sendToKitchen,
-  receipt
+  receipt,
+  createQuickSale
 }

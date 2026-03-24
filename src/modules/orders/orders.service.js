@@ -12,13 +12,21 @@ function generateOrderCode() {
   return `CMD-${Date.now()}`;
 }
 
+function generateQuickSaleCode() {
+  return `BLC-${Date.now()}`;
+}
+
+function roundMoney(value) {
+  return Number(Number(value || 0).toFixed(2));
+}
+
 function removeKitchenFlags(notes) {
-  return String(notes || '')
-    .replace(/\[KITCHEN_SENT\]/g, '')
-    .replace(/\[KITCHEN_PREPARO\]/g, '')
-    .replace(/\[KITCHEN_READY\]/g, '')
-    .replace(/\[KITCHEN_FINISHED\]/g, '')
-    .trim()
+  return String(notes || "")
+    .replace(/\[KITCHEN_SENT\]/g, "")
+    .replace(/\[KITCHEN_PREPARO\]/g, "")
+    .replace(/\[KITCHEN_READY\]/g, "")
+    .replace(/\[KITCHEN_FINISHED\]/g, "")
+    .trim();
 }
 
 function hasKitchenSentFlag(notes) {
@@ -65,11 +73,26 @@ function calculateOrderTotals(items, taxaServicoPercent = 0, couvert = 0) {
   };
 }
 
+function calculateQuickSaleTotals(items) {
+  const subtotal = items.reduce((acc, item) => {
+    return acc + Number(item.totalPrice || 0);
+  }, 0);
+
+  return {
+    subtotal: roundMoney(subtotal),
+    serviceFee: 0,
+    couvertTotal: 0,
+    discountAmount: 0,
+    total: roundMoney(subtotal),
+  };
+}
+
 function normalizeOrder(order) {
   return {
     id: order.id,
     code: order.code,
     status: order.status,
+    origin: order.origin || "MESA",
     tableId: order.tableId,
     table: order.table
       ? {
@@ -81,6 +104,7 @@ function normalizeOrder(order) {
         }
       : null,
     customerName: order.customerName,
+    customerPhone: order.customerPhone || null,
     notes: order.notes,
     subtotal: Number(order.subtotal || 0),
     serviceFee: Number(order.serviceFee || 0),
@@ -113,6 +137,16 @@ function normalizeOrder(order) {
     canceledAt: order.canceledAt,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
+    payments: (order.payments || []).map((payment) => ({
+      id: payment.id,
+      method: payment.method,
+      status: payment.status,
+      amount: Number(payment.amount || 0),
+      paidAt: payment.paidAt,
+      notes: payment.notes || null,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    })),
     items: (order.items || []).map((item) => ({
       id: item.id,
       productId: item.productId,
@@ -190,6 +224,10 @@ async function list(query) {
     where.tableId = query.tableId;
   }
 
+  if (query?.origin) {
+    where.origin = query.origin;
+  }
+
   const orders = await prisma.order.findMany({
     where,
     include: {
@@ -197,6 +235,7 @@ async function list(query) {
       createdBy: true,
       closedBy: true,
       canceledBy: true,
+      payments: true,
       items: {
         include: {
           addedBy: true,
@@ -223,6 +262,7 @@ async function getById(id) {
       createdBy: true,
       closedBy: true,
       canceledBy: true,
+      payments: true,
       items: {
         include: {
           addedBy: true,
@@ -280,6 +320,7 @@ async function create({ tableId, customerName, notes }, user) {
     data: {
       code: generateOrderCode(),
       status: "ABERTA",
+      origin: "MESA",
       tableId,
       customerName: customerName || null,
       notes: notes || null,
@@ -295,6 +336,7 @@ async function create({ tableId, customerName, notes }, user) {
       createdBy: true,
       closedBy: true,
       canceledBy: true,
+      payments: true,
       items: {
         include: {
           addedBy: true,
@@ -644,7 +686,7 @@ async function cancel(orderId, body, user) {
   if (!openCashRegister) {
     throw createError("É necessário abrir o caixa antes de abrir uma comanda", 400);
   }
-  
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
   });
@@ -679,6 +721,170 @@ async function cancel(orderId, body, user) {
   return getById(orderId);
 }
 
+async function createQuickSale(body, user) {
+  const openCashRegister = await cashRegisterService.getOpenCashRegisterOrNull();
+
+  if (!openCashRegister) {
+    throw createError("É necessário abrir o caixa antes de registrar uma venda rápida", 400);
+  }
+
+  if (!user?.id) {
+    throw createError("Usuário não identificado para registrar a venda rápida", 401);
+  }
+
+  const items = Array.isArray(body?.items) ? body.items : [];
+  const payment = body?.payment || {};
+  const notes = body?.notes || null;
+  const customerName = body?.customerName || null;
+
+  if (!items.length) {
+    throw createError("Informe pelo menos um item para a venda rápida");
+  }
+
+  if (!payment.method) {
+    throw createError("Forma de pagamento é obrigatória");
+  }
+
+  const productIds = items.map((item) => item.productId).filter(Boolean);
+
+  if (!productIds.length) {
+    throw createError("Itens inválidos para a venda rápida");
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: productIds },
+      isActive: true,
+    },
+  });
+
+  if (products.length !== productIds.length) {
+    throw createError("Um ou mais produtos não foram encontrados ou estão inativos");
+  }
+
+  const productMap = new Map(products.map((product) => [product.id, product]));
+
+  const normalizedItems = items.map((item) => {
+    const product = productMap.get(item.productId);
+
+    if (!product) {
+      throw createError("Produto inválido na venda rápida");
+    }
+
+    const quantity = Number(item.quantity || 0);
+
+    if (quantity <= 0) {
+      throw createError(`Quantidade inválida para o produto ${product.name}`);
+    }
+
+    const unitPrice =
+      item.unitPrice !== undefined && item.unitPrice !== null
+        ? Number(item.unitPrice)
+        : Number(product.price || 0);
+
+    if (unitPrice < 0) {
+      throw createError(`Preço inválido para o produto ${product.name}`);
+    }
+
+    return {
+      productId: product.id,
+      productName: product.name,
+      quantity,
+      unitPrice: roundMoney(unitPrice),
+      totalPrice: roundMoney(quantity * unitPrice),
+      notes: item.notes || null,
+      status: "ATIVO",
+    };
+  });
+
+  const totals = calculateQuickSaleTotals(normalizedItems);
+
+  const paymentAmount = roundMoney(
+    payment.amount !== undefined && payment.amount !== null
+      ? payment.amount
+      : totals.total,
+  );
+
+  if (paymentAmount !== totals.total) {
+    throw createError("O valor do pagamento deve ser igual ao total da venda");
+  }
+
+  const order = await prisma.$transaction(async (tx) => {
+    const createdOrder = await tx.order.create({
+      data: {
+        code: generateQuickSaleCode(),
+        status: "FECHADA",
+        origin: "BALCAO",
+        tableId: null,
+        customerName,
+        notes,
+        createdById: user.id,
+        closedById: user.id,
+        openedAt: new Date(),
+        closedAt: new Date(),
+        subtotal: totals.subtotal,
+        serviceFee: totals.serviceFee,
+        couvertTotal: totals.couvertTotal,
+        discountAmount: totals.discountAmount,
+        total: totals.total,
+        items: {
+          create: normalizedItems.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            notes: item.notes,
+            status: item.status,
+            addedById: user.id,
+          })),
+        },
+        payments: {
+          create: {
+            method: payment.method,
+            status: "PAGO",
+            amount: paymentAmount,
+            paidAt: new Date(),
+            cashRegisterId: openCashRegister.id,
+            registeredById: user.id,
+            notes: notes || null,
+          },
+        },
+      },
+      include: {
+        table: true,
+        createdBy: true,
+        closedBy: true,
+        canceledBy: true,
+        payments: true,
+        items: {
+          include: {
+            addedBy: true,
+            canceledBy: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
+    });
+
+    await tx.cashMovement.create({
+      data: {
+        cashRegisterId: openCashRegister.id,
+        type: "VENDA",
+        amount: totals.total,
+        orderId: createdOrder.id,
+        createdById: user.id,
+      },
+    });
+
+    return createdOrder;
+  });
+
+  return normalizeOrder(order);
+}
+
 async function generateReceiptPdf(orderId) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -686,6 +892,7 @@ async function generateReceiptPdf(orderId) {
       table: true,
       createdBy: true,
       closedBy: true,
+      payments: true,
       items: {
         orderBy: {
           createdAt: "asc",
@@ -747,16 +954,22 @@ async function generateReceiptPdf(orderId) {
 
   line();
 
-  center("COMANDA / RECIBO", 16);
+  center(order.origin === "BALCAO" ? "VENDA RÁPIDA / RECIBO" : "COMANDA / RECIBO", 16);
   doc.moveDown(0.5);
 
   leftRight("Comanda", order.code || order.id);
-  leftRight(
-    "Mesa",
-    order.table?.name ||
-      `Mesa ${String(order.table?.number || "").padStart(2, "0")}`,
-  );
-  leftRight("Cliente", order.customerName || "Mesa sem identificação");
+
+  if (order.table) {
+    leftRight(
+      "Mesa",
+      order.table?.name ||
+        `Mesa ${String(order.table?.number || "").padStart(2, "0")}`,
+    );
+  } else {
+    leftRight("Origem", order.origin || "BALCAO");
+  }
+
+  leftRight("Cliente", order.customerName || "Consumidor final");
   leftRight("Aberta em", formatDateTime(order.openedAt), 8);
   leftRight("Fechada em", formatDateTime(order.closedAt), 8);
   leftRight(
@@ -814,6 +1027,20 @@ async function generateReceiptPdf(orderId) {
   leftRight("Couvert", formatCurrency(order.couvertTotal));
   leftRight("Desconto", formatCurrency(order.discountAmount));
 
+  if (order.payments?.length) {
+    line();
+    center("PAGAMENTO", 10);
+    doc.moveDown(0.3);
+
+    order.payments.forEach((payment) => {
+      leftRight(
+        payment.method || "-",
+        `${formatCurrency(payment.amount)} (${payment.status || "-"})`,
+        8,
+      );
+    });
+  }
+
   line();
 
   doc.font("Courier-Bold");
@@ -842,6 +1069,7 @@ export default {
   getById,
   generateReceiptPdf,
   create,
+  createQuickSale,
   addItem,
   updateItem,
   cancelItem,

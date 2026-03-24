@@ -17,5 +17,6 @@ router.patch('/:id/transfer-table', controller.transferTable)
 router.patch('/:id/close', controller.close)
 router.patch('/:id/cancel', controller.cancel)
 router.get('/:id/receipt', controller.receipt)
+router.post('/quick-sale', controller.createQuickSale)
 
 export default router

@@ -61,6 +61,27 @@ enum CashMovementType {
   AJUSTE
 }
 
+enum OrderOrigin {
+  LOCAL
+  DELIVERY
+  RETIRADA
+  BALCAO
+}
+
+enum DeliveryStatus {
+  RECEBIDO
+  PREPARANDO
+  ROTA
+  ENTREGUE
+  CANCELADO
+}
+
+enum DriverStatus {
+  DISPONIVEL
+  EM_ROTA
+  INATIVO
+}
+
 model User {
   id                 String   @id @default(cuid())
   name               String
@@ -85,72 +106,6 @@ model User {
 
   createdCashMovements CashMovement[] @relation("CashMovementCreatedBy")
   registeredPayments   Payment[]      @relation("PaymentRegisteredBy")
-}
-
-model Setting {
-  id String @id @default(cuid())
-
-  // empresa
-  razaoSocial          String?
-  nomeFantasia         String?
-  cnpj                 String?
-  telefone             String?
-  whatsapp             String?
-  email                String?
-  endereco             String?
-  numero               String?
-  bairro               String?
-  cidade               String?
-  uf                   String?
-  cep                  String?
-  horarioFuncionamento String?
-  taxaServico          Decimal? @db.Decimal(10, 2)
-  couvert              Decimal? @db.Decimal(10, 2)
-  rodapeCupom          String?
-  logoUrl              String?
-
-  // operação
-  usaMesa                      Boolean @default(true)
-  usaComanda                   Boolean @default(true)
-  comandaObrigatoria           Boolean @default(false)
-  qtdMesas                     Int?
-  separarPedidoPorSetor        Boolean @default(true)
-  bloquearVendaSemEstoque      Boolean @default(true)
-  exigirObservacaoCancelamento Boolean @default(true)
-  permitirDescontoLivre        Boolean @default(false)
-
-  // impressão
-  impressoraCozinha       String?
-  impressoraBar           String?
-  impressoraCaixa         String?
-  tamanhoPapel            String?
-  imprimirAutomaticamente Boolean @default(true)
-  imprimirDuasVias        Boolean @default(false)
-  imprimirNomeGarcom      Boolean @default(true)
-  imprimirHorario         Boolean @default(true)
-
-  // notificações
-  somNovoPedido              Boolean @default(true)
-  alertaPedidoPronto         Boolean @default(true)
-  alertaMesaAbertaSemConsumo Boolean @default(false)
-  tempoAlertaMesaSemConsumo  Int?
-
-  // sistema
-  tema                    String?
-  formatoData             String?
-  fusoHorario             String?
-  logoutAutomaticoMinutos Int?
-  forcarTrocaSenhaPadrao  Boolean @default(true)
-  exibirAtalhosInicio     Boolean @default(true)
-
-  // integrações
-  whatsappToken        String?
-  webhookPedidos       String?
-  ifoodHabilitado      Boolean @default(false)
-  apiEntregaHabilitada Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Category {
@@ -212,16 +167,69 @@ model RestaurantTable {
   orders Order[]
 }
 
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  address      String?
+  neighborhood String?
+  reference    String?
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Driver {
+  id        String       @id @default(cuid())
+  name      String
+  phone     String
+  status    DriverStatus @default(DISPONIVEL)
+  isActive  Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
 model Order {
   id     String      @id @default(cuid())
   code   String      @unique
   status OrderStatus @default(ABERTA)
 
+  // 🔥 DELIVERY
+  origin         OrderOrigin?   @default(LOCAL)
+  deliveryStatus DeliveryStatus @default(RECEBIDO)
+
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+
+  customerName  String?
+  customerPhone String?
+
+  deliveryAddress      String?
+  deliveryNeighborhood String?
+  deliveryReference    String?
+  deliveryChannel      String?
+
+  priority         String? // normal | alta
+  changeFor        Decimal? @db.Decimal(10,2)
+  estimatedMinutes Int?
+
+  driverId String?
+  driver   Driver? @relation(fields: [driverId], references: [id])
+
+  dispatchedAt DateTime?
+  deliveredAt  DateTime?
+
+  // RESTO DO SISTEMA
   tableId String?
   table   RestaurantTable? @relation(fields: [tableId], references: [id])
 
-  customerName String?
-  notes        String?
+  notes String?
 
   subtotal       Decimal @default(0) @db.Decimal(10, 2)
   serviceFee     Decimal @default(0) @db.Decimal(10, 2)
@@ -230,15 +238,15 @@ model Order {
   total          Decimal @default(0) @db.Decimal(10, 2)
 
   createdById String
-  createdBy   User   @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdBy   User @relation("OrderCreatedBy", fields: [createdById], references: [id])
 
   closedById String?
-  closedBy   User?   @relation("OrderClosedBy", fields: [closedById], references: [id])
+  closedBy   User? @relation("OrderClosedBy", fields: [closedById], references: [id])
 
   canceledById String?
-  canceledBy   User?   @relation("OrderCanceledBy", fields: [canceledById], references: [id])
+  canceledBy   User? @relation("OrderCanceledBy", fields: [canceledById], references: [id])
 
-  openedAt   DateTime  @default(now())
+  openedAt   DateTime @default(now())
   closedAt   DateTime?
   canceledAt DateTime?
 
@@ -249,15 +257,17 @@ model Order {
   payments     Payment[]
   CashMovement CashMovement[]
 
-  @@index([status])
-  @@index([tableId])
+  @@index([origin])
+  @@index([deliveryStatus])
+  @@index([customerId])
+  @@index([driverId])
 }
 
 model OrderItem {
   id String @id @default(cuid())
 
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -266,18 +276,19 @@ model OrderItem {
   quantity    Int
   unitPrice   Decimal @db.Decimal(10, 2)
   totalPrice  Decimal @db.Decimal(10, 2)
-  notes       String?
+
+  notes String?
 
   status OrderItemStatus @default(ATIVO)
 
   addedById String
-  addedBy   User   @relation("OrderItemAddedBy", fields: [addedById], references: [id])
+  addedBy   User @relation("OrderItemAddedBy", fields: [addedById], references: [id])
 
   canceledById String?
-  canceledBy   User?   @relation("OrderItemCanceledBy", fields: [canceledById], references: [id])
+  canceledBy   User? @relation("OrderItemCanceledBy", fields: [canceledById], references: [id])
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   canceledAt DateTime?
 
   @@index([orderId])
@@ -289,47 +300,41 @@ model Payment {
   id String @id @default(cuid())
 
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   method PaymentMethod
   status PaymentStatus @default(PENDENTE)
-  amount Decimal       @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(10, 2)
   paidAt DateTime?
 
   cashRegisterId String?
   cashRegister   CashRegister? @relation(fields: [cashRegisterId], references: [id])
 
   registeredById String
-  registeredBy   User   @relation("PaymentRegisteredBy", fields: [registeredById], references: [id])
+  registeredBy   User @relation("PaymentRegisteredBy", fields: [registeredById], references: [id])
 
   notes String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([orderId])
-  @@index([cashRegisterId])
 }
 
 model CashRegister {
-  id     String             @id @default(cuid())
+  id     String @id @default(cuid())
   status CashRegisterStatus @default(ABERTO)
 
   openedById String
-  openedBy   User   @relation("CashRegisterOpenedBy", fields: [openedById], references: [id])
+  openedBy   User @relation("CashRegisterOpenedBy", fields: [openedById], references: [id])
 
   closedById String?
-  closedBy   User?   @relation("CashRegisterClosedBy", fields: [closedById], references: [id])
+  closedBy   User? @relation("CashRegisterClosedBy", fields: [closedById], references: [id])
 
-  openingAmount    Decimal  @db.Decimal(10, 2)
-  expectedAmount   Decimal  @default(0) @db.Decimal(10, 2)
+  openingAmount    Decimal @db.Decimal(10, 2)
+  expectedAmount   Decimal @default(0) @db.Decimal(10, 2)
   informedAmount   Decimal? @db.Decimal(10, 2)
   differenceAmount Decimal? @db.Decimal(10, 2)
 
-  openingNotes String?
-  closingNotes String?
-
-  openedAt DateTime  @default(now())
+  openedAt DateTime @default(now())
   closedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -337,35 +342,24 @@ model CashRegister {
 
   movements CashMovement[]
   payments  Payment[]
-
-  @@index([status])
 }
 
 model CashMovement {
   id String @id @default(cuid())
 
   cashRegisterId String
-  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id], onDelete: Cascade)
+  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id])
 
-  type          CashMovementType
-  paymentMethod PaymentMethod?
-
-  category    String?
-  description String?
-  amount      Decimal @db.Decimal(10, 2)
+  type   CashMovementType
+  amount Decimal @db.Decimal(10, 2)
 
   orderId String?
-  order   Order?  @relation(fields: [orderId], references: [id])
+  order   Order? @relation(fields: [orderId], references: [id])
 
   createdById String
-  createdBy   User   @relation("CashMovementCreatedBy", fields: [createdById], references: [id])
+  createdBy   User @relation("CashMovementCreatedBy", fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([cashRegisterId])
-  @@index([type])
-  @@index([orderId])
 }
 
 model Additional {
@@ -413,7 +407,7 @@ model ComboItem {
   id String @id @default(cuid())
 
   comboId String
-  combo   Combo  @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  combo   Combo @relation(fields: [comboId], references: [id], onDelete: Cascade)
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
