@@ -335,6 +335,7 @@ model CashRegister {
   differenceAmount Decimal? @db.Decimal(10, 2)
   openingNotes String?
   closingNotes String?
+  observations String?
 
   openedAt DateTime @default(now())
   closedAt DateTime?
