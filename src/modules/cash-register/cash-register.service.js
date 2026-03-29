@@ -362,7 +362,7 @@ async function close({ informedAmount, closingNotes }, userId) {
         closedById: userId,
         informedAmount: Number(informedAmount),
         differenceAmount,
-        closingNotes: closingNotes || null,
+        // closingNotes: closingNotes || null,
         closedAt: new Date(),
       },
       include: {

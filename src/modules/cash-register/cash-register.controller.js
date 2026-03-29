@@ -59,8 +59,8 @@ async function close(req, res, next) {
 
     const result = await cashRegisterService.close(
       {
-        informedAmount: req.body.saldoInformado,
-        closingNotes: req.body.observacao,
+        informedAmount: req.body.saldoInformado
+        // closingNotes: req.body.observacao,
       },
       userId,
     )
