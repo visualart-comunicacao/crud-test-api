@@ -54,8 +54,8 @@ function normalizeCashRegister(cashRegister, extra = {}) {
     saldoEsperado: toNumber(cashRegister.expectedAmount),
     saldoInformado: cashRegister.informedAmount != null ? toNumber(cashRegister.informedAmount) : 0,
     diferenca: cashRegister.differenceAmount != null ? toNumber(cashRegister.differenceAmount) : 0,
-    observacaoAbertura: cashRegister.openingNotes || '',
-    observacaoFechamento: cashRegister.closingNotes || '',
+    // observacaoAbertura: cashRegister.openingNotes || '',
+    // observacaoFechamento: cashRegister.closingNotes || '',
     resumoFormas: extra.resumoFormas || {
       DINHEIRO: 0,
       PIX: 0,
@@ -263,7 +263,7 @@ async function getCurrent() {
   }
 }
 
-async function open({ openingAmount, openingNotes }, userId) {
+async function open({ openingAmount }, userId) {
   if (!userId) {
     throw createError('Usuário não autenticado para abrir o caixa', 401)
   }
@@ -283,8 +283,8 @@ async function open({ openingAmount, openingNotes }, userId) {
       status: 'ABERTO',
       openedById: userId,
       openingAmount: Number(openingAmount),
-      expectedAmount: Number(openingAmount),
-      openingNotes: openingNotes || null,
+      expectedAmount: Number(openingAmount)
+      // openingNotes: openingNotes || null,
     },
     include: {
       openedBy: true,
