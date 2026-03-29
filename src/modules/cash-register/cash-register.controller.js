@@ -20,7 +20,7 @@ async function open(req, res, next) {
     const result = await cashRegisterService.open(
       {
         openingAmount: req.body.fundoInicial,
-        openingNotes: req.body.observacao,
+        // openingNotes: req.body.observacao,
       },
       userId,
     )
