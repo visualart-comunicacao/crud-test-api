@@ -13,12 +13,15 @@ import cashRegisterRoutes from '../modules/cash-register/cash-register.routes.js
 import customersRoutes from '../modules/customers/customers.routes.js'
 import driversRoutes from '../modules/drivers/drivers.routes.js'
 import deliveryRoutes from '../modules/delivery/delivery.routes.js'
+import publicMenuRoutes from '../modules/public-menu/public-menu.routes.js'
 
 const router = Router()
 
 router.get('/v1/health', (req, res) => {
   res.json({ status: 'ok' })
 })
+
+router.use('/v1/public', publicMenuRoutes)
 
 router.use('/v1/auth', authRoutes)
 router.use('/v1/users', usersRoutes)
